@@ -1,4 +1,4 @@
-mod hook_old;
+mod hook;
 
 use std::ffi::c_void;
 use std::iter::once;
@@ -11,7 +11,8 @@ use windows_sys::Win32::Foundation::{BOOL, FALSE, HMODULE, HWND, TRUE};
 use windows_sys::Win32::System::LibraryLoader::{DisableThreadLibraryCalls, GetModuleHandleW, GetProcAddress};
 use windows_sys::Win32::System::SystemServices::*;
 use windows_sys::Win32::System::Threading::CreateThread;
-use windows_sys::Win32::UI::WindowsAndMessaging::{MB_OK, MessageBoxW, SET_WINDOW_POS_FLAGS};
+use windows_sys::Win32::UI::WindowsAndMessaging::{MB_OK, MessageBoxW, SET_WINDOW_POS_FLAGS, TIMERPROC};
+use crate::hook::install_hook;
 
 #[no_mangle]
 pub unsafe extern "stdcall" fn DllMain(hmodule: HMODULE, reason: u32, _: *mut c_void) -> BOOL {
@@ -39,24 +40,31 @@ pub unsafe extern "stdcall" fn DllMain(hmodule: HMODULE, reason: u32, _: *mut c_
 type WinPosSig = extern "system" fn(HWND, HWND, i32, i32, i32, i32, SET_WINDOW_POS_FLAGS) -> BOOL;
 static HOOK: OnceCell<RawDetour> = OnceCell::new();
 
+//#[allow(non_snake_case)]
+//unsafe extern "system" fn SetWindowPos(hwnd: HWND, _hwndinsertafter: HWND, x: i32, y: i32, cx: i32, cy: i32, uflags: SET_WINDOW_POS_FLAGS) -> BOOL {
+//    //let original: WinPosSig = std::mem::transmute(HOOK.get_unchecked().trampoline());
+//    //original(hwnd, 0, x, y, cx, cy, uflags)
+//    //MessageBoxW(0, w!("Test"), w!("Title"), MB_OK);
+//    println!("Test");
+//    TRUE
+//}
+
 #[allow(non_snake_case)]
-unsafe extern "system" fn SetWindowPos(hwnd: HWND, _hwndinsertafter: HWND, x: i32, y: i32, cx: i32, cy: i32, uflags: SET_WINDOW_POS_FLAGS) -> BOOL {
-    let original: WinPosSig = std::mem::transmute(HOOK.get_unchecked().trampoline());
-    original(hwnd, 0, x, y, cx, cy, uflags)
+pub unsafe extern "system" fn SetTimer(hwnd: HWND, nidevent: usize, uelapse: u32, lptimerfunc: TIMERPROC) -> usize {
+    println!("Test");
+    12
 }
 
 unsafe fn hook() -> anyhow::Result<()> {
     let user32_lib = GetModuleHandleW(w!("user32.dll"));
     ensure!(user32_lib != 0);
 
-    let set_window_pos = GetProcAddress(user32_lib, s!("SetWindowPos"));
+    let set_window_pos = GetProcAddress(user32_lib, s!("SetTimer"));
     ensure!(set_window_pos.is_some());
     let set_window_pos = set_window_pos.unwrap();
 
-    let offset = (((SetWindowPos as *mut isize) as isize - (set_window_pos as *mut isize) as isize) - 5) as usize;
-    println!("{}", offset);
-
-    HOOK.get_or_try_init(|| RawDetour::new(set_window_pos as *const (), SetWindowPos as *const ()))?.enable()?;
+    //HOOK.get_or_try_init(|| RawDetour::new(set_window_pos as *const (), SetWindowPos as *const ()))?.enable()?;
+    install_hook(set_window_pos as *const c_void, SetTimer as *const c_void);
     Ok(())
 }
 
@@ -65,7 +73,7 @@ unsafe extern "system" fn attachment_thread(_lpthreadparameter: *mut c_void) -> 
         .encode_utf16()
         .chain(once(0u16))
         .collect::<Vec<u16>>();
-    MessageBoxW(0, result.as_ptr(), w!("Hook result"), MB_OK);
+    ///MessageBoxW(0, result.as_ptr(), w!("Hook result"), MB_OK);
     0
 }
 

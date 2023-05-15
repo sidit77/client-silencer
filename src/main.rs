@@ -1,9 +1,7 @@
 use std::env::current_exe;
-use std::ffi::c_void;
 use std::mem::size_of_val;
-use std::ptr::null_mut;
 use sysinfo::{PidExt, ProcessExt, SystemExt};
-use widestring::{U16CString, U16String};
+use widestring::{U16CString};
 use windows::imp::GetProcAddress;
 use windows::{s, w};
 use windows::Win32::System::Diagnostics::Debug::WriteProcessMemory;
@@ -13,7 +11,7 @@ use windows::Win32::System::Threading::*;
 
 fn main() {
     unsafe {
-        let pid = sysinfo::System::new_all().processes_by_name("mpc-be64.exe").next().unwrap().pid().as_u32();
+        let pid = sysinfo::System::new_all().processes_by_name("hotkey-timer.exe").next().unwrap().pid().as_u32();
 
         println!("pid: {}", pid);
 

@@ -12,6 +12,7 @@ members = [
 ]
 
 [dependencies]
+client-hook = { path = "client-hook" }
 widestring = "1"
 num_enum = "0.6"
 sysinfo = "0.29"

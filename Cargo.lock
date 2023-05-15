@@ -46,6 +46,7 @@ dependencies = [
 name = "client-silencer"
 version = "0.1.0"
 dependencies = [
+ "client-hook",
  "num_enum",
  "sysinfo",
  "widestring",
