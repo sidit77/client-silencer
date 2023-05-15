@@ -1,6 +1,8 @@
 mod hook;
+mod import;
 
 use std::ffi::c_void;
+use std::fmt::Debug;
 use std::iter::once;
 use std::ptr::{null, null_mut};
 use anyhow::ensure;
@@ -13,6 +15,7 @@ use windows_sys::Win32::System::SystemServices::*;
 use windows_sys::Win32::System::Threading::CreateThread;
 use windows_sys::Win32::UI::WindowsAndMessaging::{MB_OK, MessageBoxW, SET_WINDOW_POS_FLAGS, TIMERPROC};
 use crate::hook::install_hook;
+use crate::import::find_iat;
 
 #[no_mangle]
 pub unsafe extern "stdcall" fn DllMain(hmodule: HMODULE, reason: u32, _: *mut c_void) -> BOOL {
@@ -56,15 +59,17 @@ pub unsafe extern "system" fn SetTimer(hwnd: HWND, nidevent: usize, uelapse: u32
 }
 
 unsafe fn hook() -> anyhow::Result<()> {
-    let user32_lib = GetModuleHandleW(w!("user32.dll"));
-    ensure!(user32_lib != 0);
-
-    let set_window_pos = GetProcAddress(user32_lib, s!("SetTimer"));
-    ensure!(set_window_pos.is_some());
-    let set_window_pos = set_window_pos.unwrap();
-
-    //HOOK.get_or_try_init(|| RawDetour::new(set_window_pos as *const (), SetWindowPos as *const ()))?.enable()?;
-    install_hook(set_window_pos as *const c_void, SetTimer as *const c_void);
+    std::panic::catch_unwind(|| find_iat())
+        .unwrap_or_else(|_| println!("Panicked"));
+    //let user32_lib = GetModuleHandleW(w!("user32.dll"));
+    //ensure!(user32_lib != 0);
+//
+    //let set_window_pos = GetProcAddress(user32_lib, s!("SetTimer"));
+    //ensure!(set_window_pos.is_some());
+    //let set_window_pos = set_window_pos.unwrap();
+//
+    ////HOOK.get_or_try_init(|| RawDetour::new(set_window_pos as *const (), SetWindowPos as *const ()))?.enable()?;
+    //install_hook(set_window_pos as *const c_void, SetTimer as *const c_void);
     Ok(())
 }
 
