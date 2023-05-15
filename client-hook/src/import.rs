@@ -1,5 +1,6 @@
-use std::ffi::{c_char, c_void, CStr};
+use std::ffi::{c_void, CStr};
 use std::mem::size_of;
+use std::ops::Add;
 use std::ptr::{addr_of, null};
 use once_cell::sync::OnceCell;
 use windows_sys::Win32::Foundation::{HMODULE, HWND};
@@ -9,11 +10,6 @@ use windows_sys::Win32::System::Memory::*;
 use windows_sys::Win32::System::SystemServices::*;
 use windows_sys::Win32::System::WindowsProgramming::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::TIMERPROC;
-
-unsafe fn read_at<T>(base: HMODULE) -> T {
-    let ptr = base as *const T;
-    ptr.read()
-}
 
 #[cfg(target_pointer_width = "32")]
 #[allow(non_camel_case_types)]
@@ -38,33 +34,34 @@ type TimerProto = extern "system" fn(HWND, usize, u32, TIMERPROC) -> usize;
 static HOOK: OnceCell<TimerProto> = OnceCell::new();
 
 pub unsafe fn find_iat() {
-    let base = GetModuleHandleW(null());
-    let dos_header: IMAGE_DOS_HEADER = read_at(base);
+    let base: IntPtr = GetModuleHandleW(null()).into();
+    assert!(base.is_not_null());
+    let dos_header: IMAGE_DOS_HEADER = base.read();
     assert_eq!(dos_header.e_magic, IMAGE_DOS_SIGNATURE);
-    let pe_header: IMAGE_NT_HEADERS = read_at(base + dos_header.e_lfanew as isize);
+    let pe_header: IMAGE_NT_HEADERS = (base + dos_header.e_lfanew.into()).read();
     assert_eq!(pe_header.Signature, IMAGE_NT_SIGNATURE);
     let optional_header = pe_header.OptionalHeader;
     assert_eq!(optional_header.Magic, IMAGE_NT_OPTIONAL_HDR_MAGIC);
 
     let import_dir = optional_header.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT as usize];
-    let descriptor_start_rva = import_dir.VirtualAddress;
-    let mut import_descriptor_ptr= (base + descriptor_start_rva as isize) as *const IMAGE_IMPORT_DESCRIPTOR;
+    let descriptor_start_rva = import_dir.VirtualAddress.into();
+    let mut import_descriptor_ptr: *const IMAGE_IMPORT_DESCRIPTOR = (base + descriptor_start_rva).as_ptr();
 
     loop {
         let import_descriptor = import_descriptor_ptr.read();
         if import_descriptor.Anonymous.Characteristics == 0 {
             break;
         }
-        let name = CStr::from_ptr((base + import_descriptor.Name as isize) as *const c_char);
+        let name = CStr::from_ptr((base + import_descriptor.Name.into()).as_ptr());
         println!("{:?}", name);
 
-        let mut thunk_ilt = import_descriptor.Anonymous.OriginalFirstThunk as *const IMAGE_THUNK_DATA;
-        let mut thunk_iat = import_descriptor.FirstThunk as *mut IMAGE_THUNK_DATA;
-        assert!(!thunk_ilt.is_null());
-        assert!(!thunk_iat.is_null());
+        let thunk_ilt: IntPtr = import_descriptor.Anonymous.OriginalFirstThunk.into();
+        let thunk_iat: IntPtr = import_descriptor.FirstThunk.into();
+        assert!(thunk_ilt.is_not_null());
+        assert!(thunk_iat.is_not_null());
 
-        thunk_ilt = (base + thunk_ilt as isize) as *const IMAGE_THUNK_DATA;
-        thunk_iat = (base + thunk_iat as isize) as *mut IMAGE_THUNK_DATA;
+        let mut thunk_ilt: *const IMAGE_THUNK_DATA = (base + thunk_ilt).as_ptr();
+        let mut thunk_iat: *mut IMAGE_THUNK_DATA = (base + thunk_iat).as_mut_ptr();
         assert!(!thunk_ilt.is_null());
         assert!(!thunk_iat.is_null());
 
@@ -74,7 +71,7 @@ pub unsafe fn find_iat() {
                 break;
             }
             if ilt.u1.Ordinal & IMAGE_ORDINAL_FLAG == 0 {
-                let name= (base + ilt.u1.AddressOfData as isize) as *const IMAGE_IMPORT_BY_NAME;
+                let name: *const IMAGE_IMPORT_BY_NAME = (base + ilt.u1.AddressOfData.into()).as_ptr();
                 let func_name = CStr::from_ptr((*name).Name.as_ptr() as _);
                 println!("    {:?}", func_name);
                 if func_name.to_bytes() == b"SetTimer" {
@@ -93,6 +90,64 @@ pub unsafe fn find_iat() {
         import_descriptor_ptr = import_descriptor_ptr.offset(1);
     }
 
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[repr(transparent)]
+struct IntPtr(usize);
+
+impl IntPtr {
+    fn is_not_null(self) -> bool {
+        self.0 != 0
+    }
+    fn as_ptr<T>(self) -> *const T {
+        self.0 as *const T
+    }
+    fn as_mut_ptr<T>(self) -> *mut T {
+        self.0 as *mut T
+    }
+    unsafe fn read<T>(self) -> T {
+        self.as_ptr::<T>().read()
+    }
+}
+
+impl From<usize> for IntPtr {
+    fn from(value: usize) -> Self {
+        IntPtr(value)
+    }
+}
+
+impl From<isize> for IntPtr {
+    fn from(value: isize) -> Self {
+        IntPtr(value as usize)
+    }
+}
+
+impl From<u32> for IntPtr {
+    fn from(value: u32) -> Self {
+        IntPtr(value as usize)
+    }
+}
+
+impl From<i32> for IntPtr {
+    fn from(value: i32) -> Self {
+        IntPtr(value as usize)
+    }
+}
+
+#[cfg(target_pointer_width = "64")]
+impl From<u64> for IntPtr {
+    fn from(value: u64) -> Self {
+        IntPtr(value as usize)
+    }
+}
+
+impl Add for IntPtr {
+    type Output = IntPtr;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        IntPtr(self.0 + rhs.0)
+    }
 }
 
 unsafe fn write_protected<T>(src: *const c_void, data: T) {
