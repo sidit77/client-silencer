@@ -1,4 +1,17 @@
+use std::ffi::c_void;
+use std::mem::size_of;
 use std::ops::{Add, Sub};
+use windows_sys::Win32::Foundation::FALSE;
+use windows_sys::Win32::System::Memory::{PAGE_READWRITE, VirtualProtect};
+
+#[macro_export]
+macro_rules! ensure {
+    ($cond:expr, $result:expr) => {
+        if !($cond) {
+            return Err($result)
+        }
+    }
+}
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 #[repr(transparent)]
@@ -118,9 +131,31 @@ impl<T> Iterator for IterPtr<T> {
     }
 }
 
+pub unsafe fn write_protected<T>(src: *const c_void, data: T) -> Result<(), Error> {
+    let mut protection = 0;
+    ensure!(VirtualProtect(
+        src,
+        size_of::<T>(),
+        PAGE_READWRITE,
+        &mut protection
+    ) != FALSE, Error::WinError);
+    let target = src as *mut T;
+
+    target.write(data);
+
+    ensure!(VirtualProtect(
+        src,
+        size_of::<T>(),
+        protection,
+        &mut protection
+    ) != FALSE, Error::WinError);
+    Ok(())
+}
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Error {
     BadPeFormat,
     ModuleNotFound,
-    FunctionNotFound
+    FunctionNotFound,
+    WinError
 }

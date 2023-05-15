@@ -1,20 +1,11 @@
-use std::ffi::{c_void, CStr};
-use std::mem::size_of;
+use std::ffi::CStr;
 use std::ptr::{addr_of, null};
 use windows_sys::Win32::System::Diagnostics::Debug::*;
 use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
-use windows_sys::Win32::System::Memory::*;
 use windows_sys::Win32::System::SystemServices::*;
 use windows_sys::Win32::System::WindowsProgramming::*;
+use crate::ensure;
 use crate::utils::{Error, IntPtr, IterPtr, RawIterPtr};
-
-macro_rules! ensure {
-    ($cond:expr, $result:expr) => {
-        if !($cond) {
-            return Err($result)
-        }
-    }
-}
 
 #[cfg(target_pointer_width = "32")]
 #[allow(non_camel_case_types)]
@@ -37,7 +28,7 @@ const IMAGE_ORDINAL_FLAG: u64 = IMAGE_ORDINAL_FLAG64;
 
 pub unsafe fn find_function_iat(module: &[u8], name: &[u8]) -> Result<IntPtr, Error> {
     let base: IntPtr = GetModuleHandleW(null()).into();
-    ensure!(base.is_not_null(), Error::BadPeFormat);
+    ensure!(base.is_not_null(), Error::WinError);
     let dos_header: IMAGE_DOS_HEADER = base.read();
     ensure!(dos_header.e_magic == IMAGE_DOS_SIGNATURE, Error::BadPeFormat);
     let pe_header: IMAGE_NT_HEADERS = (base + dos_header.e_lfanew.into()).read();
@@ -76,24 +67,4 @@ pub unsafe fn find_function_iat(module: &[u8], name: &[u8]) -> Result<IntPtr, Er
         }
     }
     Err(Error::ModuleNotFound)
-}
-
-pub unsafe fn write_protected<T>(src: *const c_void, data: T) {
-    let mut protection = 0;
-    VirtualProtect(
-        src,
-        size_of::<T>(),
-        PAGE_READWRITE,
-        &mut protection
-    );
-    let target = src as *mut T;
-
-    target.write(data);
-
-    VirtualProtect(
-        src,
-        size_of::<T>(),
-        protection,
-        &mut protection
-    );
 }
