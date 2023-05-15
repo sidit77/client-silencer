@@ -2,10 +2,6 @@ use std::ops::{Add, Sub};
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 #[repr(transparent)]
-struct PtrOffset(isize);
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-#[repr(transparent)]
 pub struct IntPtr(usize);
 
 impl IntPtr {
@@ -15,14 +11,8 @@ impl IntPtr {
     pub fn as_ptr<T>(self) -> *const T {
         self.0 as *const T
     }
-    pub fn as_mut_ptr<T>(self) -> *mut T {
-        self.0 as *mut T
-    }
     pub unsafe fn read<T>(self) -> T {
         self.as_ptr::<T>().read()
-    }
-    pub fn offset(self, next: Self) -> PtrOffset {
-        PtrOffset(next.0 as isize - self.0 as isize)
     }
 }
 
@@ -46,6 +36,12 @@ impl From<u32> for IntPtr {
 
 impl From<i32> for IntPtr {
     fn from(value: i32) -> Self {
+        IntPtr(value as usize)
+    }
+}
+
+impl<T> From<*const T> for IntPtr {
+    fn from(value: *const T) -> Self {
         IntPtr(value as usize)
     }
 }
@@ -122,6 +118,9 @@ impl<T> Iterator for IterPtr<T> {
     }
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Error {
-    BadPeFormat
+    BadPeFormat,
+    ModuleNotFound,
+    FunctionNotFound
 }

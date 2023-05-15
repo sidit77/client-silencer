@@ -32,7 +32,7 @@ fn main() {
         dll_path.pop();
         dll_path.push("client_hook.dll");
         assert!(dll_path.exists());
-        let dll_path =  U16CString::from_os_str(&dll_path.into_os_string()).unwrap();
+        let dll_path =  U16CString::from_os_str(dll_path.into_os_string()).unwrap();
         println!("{} ({})", dll_path.display(), dll_path.len());
         let dll_path = dll_path.as_slice_with_nul();
         println!("{}", size_of_val(dll_path));
