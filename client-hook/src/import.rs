@@ -1,14 +1,13 @@
 use std::ffi::{c_char, c_void, CStr};
-use std::fmt::Debug;
 use std::mem::size_of;
-use std::ptr::{addr_of, copy_nonoverlapping, null};
+use std::ptr::{addr_of, null};
 use once_cell::sync::OnceCell;
 use windows_sys::Win32::Foundation::{HMODULE, HWND};
-use windows_sys::Win32::System::Diagnostics::Debug::{IMAGE_DIRECTORY_ENTRY_IMPORT, IMAGE_NT_HEADERS32, IMAGE_NT_HEADERS64, IMAGE_NT_OPTIONAL_HDR_MAGIC};
+use windows_sys::Win32::System::Diagnostics::Debug::*;
 use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
-use windows_sys::Win32::System::Memory::{PAGE_EXECUTE_READWRITE, PAGE_READWRITE, VirtualProtect};
-use windows_sys::Win32::System::SystemServices::{IMAGE_DOS_HEADER, IMAGE_DOS_SIGNATURE, IMAGE_IMPORT_BY_NAME, IMAGE_IMPORT_DESCRIPTOR, IMAGE_NT_SIGNATURE, IMAGE_ORDINAL_FLAG32, IMAGE_ORDINAL_FLAG64};
-use windows_sys::Win32::System::WindowsProgramming::IMAGE_THUNK_DATA64;
+use windows_sys::Win32::System::Memory::*;
+use windows_sys::Win32::System::SystemServices::*;
+use windows_sys::Win32::System::WindowsProgramming::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::TIMERPROC;
 
 unsafe fn read_at<T>(base: HMODULE) -> T {
@@ -17,13 +16,17 @@ unsafe fn read_at<T>(base: HMODULE) -> T {
 }
 
 #[cfg(target_pointer_width = "32")]
+#[allow(non_camel_case_types)]
 type IMAGE_NT_HEADERS = IMAGE_NT_HEADERS32;
 #[cfg(target_pointer_width = "64")]
+#[allow(non_camel_case_types)]
 type IMAGE_NT_HEADERS = IMAGE_NT_HEADERS64;
 
 #[cfg(target_pointer_width = "32")]
+#[allow(non_camel_case_types)]
 type IMAGE_THUNK_DATA = IMAGE_THUNK_DATA32;
 #[cfg(target_pointer_width = "64")]
+#[allow(non_camel_case_types)]
 type IMAGE_THUNK_DATA = IMAGE_THUNK_DATA64;
 
 #[cfg(target_pointer_width = "32")]
@@ -113,7 +116,7 @@ unsafe fn write_protected<T>(src: *const c_void, data: T) {
 }
 
 #[allow(non_snake_case)]
-pub unsafe extern "system" fn SetTimer(hwnd: HWND, nidevent: usize, uelapse: u32, lptimerfunc: TIMERPROC) -> usize {
+pub unsafe extern "system" fn SetTimer(hwnd: HWND, nidevent: usize, _uelapse: u32, lptimerfunc: TIMERPROC) -> usize {
     println!("Test");
     HOOK.get_unchecked()(hwnd, nidevent, 1000, lptimerfunc)
 }
