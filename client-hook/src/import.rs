@@ -7,6 +7,9 @@ use windows_sys::Win32::System::WindowsProgramming::*;
 use crate::ensure;
 use crate::utils::{Error, IntPtr, IterPtr, RawIterPtr};
 
+//use std::io::Write;
+//use std::fs::File;
+
 #[cfg(target_pointer_width = "32")]
 #[allow(non_camel_case_types)]
 type IMAGE_NT_HEADERS = IMAGE_NT_HEADERS32;
@@ -27,6 +30,8 @@ const IMAGE_ORDINAL_FLAG: u32 = IMAGE_ORDINAL_FLAG32;
 const IMAGE_ORDINAL_FLAG: u64 = IMAGE_ORDINAL_FLAG64;
 
 pub unsafe fn find_function_iat(module: &[u8], name: &[u8]) -> Result<IntPtr, Error> {
+    //let mut file = File::create("F:\\log.txt").unwrap();
+
     let base: IntPtr = GetModuleHandleW(null()).into();
     ensure!(base.is_not_null(), Error::WinError);
     let dos_header: IMAGE_DOS_HEADER = base.read();
@@ -43,6 +48,7 @@ pub unsafe fn find_function_iat(module: &[u8], name: &[u8]) -> Result<IntPtr, Er
         |desc| desc.Anonymous.Characteristics != 0
     ) {
         let module_name = CStr::from_ptr((base + import_descriptor.Name.into()).as_ptr());
+        //writeln!(file, "{:?}", module_name);
         if module_name.to_bytes() == module {
             let thunk_ilt: IntPtr = import_descriptor.Anonymous.OriginalFirstThunk.into();
             let thunk_iat: IntPtr = import_descriptor.FirstThunk.into();
@@ -58,6 +64,7 @@ pub unsafe fn find_function_iat(module: &[u8], name: &[u8]) -> Result<IntPtr, Er
                 if ilt.u1.Ordinal & IMAGE_ORDINAL_FLAG == 0 {
                     let import: *const IMAGE_IMPORT_BY_NAME = (base + ilt.u1.AddressOfData.into()).as_ptr();
                     let func_name = CStr::from_ptr((*import).Name.as_ptr() as _);
+                    //writeln!(file, "    {:?}", func_name);
                     if func_name.to_bytes() == name {
                         return Ok(addr_of!((*iat).u1.Function).into())
                     }

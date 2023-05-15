@@ -11,7 +11,7 @@ use windows::Win32::System::Threading::*;
 
 fn main() {
     unsafe {
-        let pid = sysinfo::System::new_all().processes_by_name("hotkey-timer.exe").next().unwrap().pid().as_u32();
+        let pid = sysinfo::System::new_all().processes_by_name("mpc-be64.exe").next().unwrap().pid().as_u32();
 
         println!("pid: {}", pid);
 
