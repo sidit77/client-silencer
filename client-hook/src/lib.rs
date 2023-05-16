@@ -1,25 +1,36 @@
 #![no_std]
 #![allow(clippy::missing_safety_doc)]
 
-extern crate alloc;
+#[link(name = "vcruntime")]
+#[link(name = "ucrt")]
+#[link(name = "msvcrt")]
+extern {}
 
 mod import;
 mod utils;
 
-use alloc::format;
-use alloc::vec::Vec;
+//use alloc::format;
+//use alloc::vec::Vec;
 use core::ffi::c_void;
-use core::iter::once;
+use core::panic;
 use core::ptr::{null, null_mut};
-use once_cell::sync::OnceCell;
+use crossbeam_utils::atomic::AtomicCell;
+//use once_cell::unsync::OnceCell;
+//use once_cell::sync::OnceCell;
+//use once_cell::race::OnceRef;
 use windows_sys::w;
 use windows_sys::Win32::Foundation::{BOOL, FALSE, HMODULE, HWND, TRUE};
 use windows_sys::Win32::System::LibraryLoader::{DisableThreadLibraryCalls};
 use windows_sys::Win32::System::SystemServices::*;
-use windows_sys::Win32::System::Threading::CreateThread;
+use windows_sys::Win32::System::Threading::{CreateThread, ExitProcess};
 use windows_sys::Win32::UI::WindowsAndMessaging::{MB_OK, MessageBoxW, SET_WINDOW_POS_FLAGS, SWP_NOZORDER};
 use crate::import::find_function_iat;
 use crate::utils::{Error, write_protected};
+
+#[panic_handler]
+fn panic(_info: &panic::PanicInfo) -> ! {
+    unsafe { ExitProcess(1) }
+}
 
 #[no_mangle]
 pub unsafe extern "stdcall" fn DllMain(hmodule: HMODULE, reason: u32, _: *mut c_void) -> BOOL {
@@ -64,12 +75,43 @@ pub unsafe extern "stdcall" fn DllMain(hmodule: HMODULE, reason: u32, _: *mut c_
 //    Ok(())
 //}
 
+/*
+pub struct Assert<const COND: bool> {}
+pub trait IsTrue {}
+impl IsTrue for Assert<true> {}
+
+
+struct AtomicFn<T> {
+    inner: AtomicUsize,
+    _phantom: PhantomData<T>
+}
+
+impl<T: Pointer> AtomicFn<T>  {
+    //const OK: () = assert!(size_of::<T>() == size_of::<usize>(), "Can only be use with types that have the same size as usize");
+    pub const fn empty() -> Self {
+        Self {
+            inner: AtomicUsize::new(0),
+            _phantom: PhantomData,
+        }
+    }
+
+    pub fn set(&self, value: Option<T>) {
+        self.inner.store(unsafe { transmute_copy(&value) }, Ordering::Release);
+    }
+
+    pub fn get(&self) -> Option<T> {
+        unsafe { transmute_copy(&self.inner.load(Ordering::Acquire)) }
+    }
+
+}
+ */
+
 type SetPosProto = extern "system" fn(HWND, HWND, i32, i32, i32, i32, SET_WINDOW_POS_FLAGS) -> BOOL;
-static OLD_POS_FUNC: OnceCell<SetPosProto> = OnceCell::new();
+static OLD_POS_FUNC: AtomicCell<Option<SetPosProto>> = AtomicCell::new(None);
 #[allow(non_snake_case)]
 pub unsafe extern "system" fn SetWindowPos(hwnd: HWND, hwndinsertafter: HWND, x: i32, y: i32, cx: i32, cy: i32, uflags: SET_WINDOW_POS_FLAGS) -> BOOL {
     OLD_POS_FUNC
-        .get()
+        .load()
         .map(|func| func(hwnd, hwndinsertafter, x, y, cx, cy, uflags | SWP_NOZORDER))
         .unwrap_or(FALSE)
 }
@@ -77,7 +119,7 @@ pub unsafe extern "system" fn SetWindowPos(hwnd: HWND, hwndinsertafter: HWND, x:
 unsafe fn hook() -> Result<(), Error> {
     let func_ptr = find_function_iat(b"user32.dll", b"SetWindowPos")
         .or_else(|_| find_function_iat(b"USER32.dll", b"SetWindowPos"))?;
-    OLD_POS_FUNC.get_or_init(|| unsafe { func_ptr.read() });
+    OLD_POS_FUNC.store(unsafe { func_ptr.read() });
     write_protected(func_ptr.as_ptr(), SetWindowPos as usize)?;
     Ok(())
 }
@@ -86,11 +128,7 @@ unsafe fn hook() -> Result<(), Error> {
 
 unsafe extern "system" fn attachment_thread(_lpthreadparameter: *mut c_void) -> u32 {
     if let Err(err) = hook() {
-        let result = format!("{:?}", err)
-            .encode_utf16()
-            .chain(once(0u16))
-            .collect::<Vec<u16>>();
-        MessageBoxW(0, result.as_ptr(), w!("Hook Failed"), MB_OK);
+        MessageBoxW(0, err.msg(), w!("Hook Failed"), MB_OK);
     }
     0
 }

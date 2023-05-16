@@ -1,6 +1,7 @@
 use core::ffi::c_void;
 use core::mem::size_of;
 use core::ops::{Add, Sub};
+use windows_sys::w;
 use windows_sys::Win32::Foundation::FALSE;
 use windows_sys::Win32::System::Memory::{PAGE_READWRITE, VirtualProtect};
 
@@ -138,7 +139,7 @@ pub unsafe fn write_protected<T>(src: *const c_void, data: T) -> Result<(), Erro
         size_of::<T>(),
         PAGE_READWRITE,
         &mut protection
-    ) != FALSE, Error::WinError);
+    ) != FALSE, Error::WindowsFailure);
     let target = src as *mut T;
 
     target.write(data);
@@ -148,7 +149,7 @@ pub unsafe fn write_protected<T>(src: *const c_void, data: T) -> Result<(), Erro
         size_of::<T>(),
         protection,
         &mut protection
-    ) != FALSE, Error::WinError);
+    ) != FALSE, Error::WindowsFailure);
     Ok(())
 }
 
@@ -157,5 +158,16 @@ pub enum Error {
     BadPeFormat,
     ModuleNotFound,
     FunctionNotFound,
-    WinError
+    WindowsFailure
+}
+
+impl Error {
+    pub fn msg(self) -> *const u16 {
+        match self {
+            Error::BadPeFormat => w!("Failed to read executable"),
+            Error::ModuleNotFound => w!("Could not find the specified module"),
+            Error::FunctionNotFound => w!("Could not find the specified function"),
+            Error::WindowsFailure => w!("A Windows function returned unsuccessfully")
+        }
+    }
 }

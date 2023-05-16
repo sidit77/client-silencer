@@ -33,7 +33,7 @@ pub unsafe fn find_function_iat(module: &[u8], name: &[u8]) -> Result<IntPtr, Er
     //let mut file = File::create("F:\\log.txt").unwrap();
 
     let base: IntPtr = GetModuleHandleW(null()).into();
-    ensure!(base.is_not_null(), Error::WinError);
+    ensure!(base.is_not_null(), Error::WindowsFailure);
     let dos_header: IMAGE_DOS_HEADER = base.read();
     ensure!(dos_header.e_magic == IMAGE_DOS_SIGNATURE, Error::BadPeFormat);
     let pe_header: IMAGE_NT_HEADERS = (base + dos_header.e_lfanew.into()).read();
