@@ -4,13 +4,14 @@ use std::mem::{size_of, transmute, zeroed};
 use std::os::windows::ffi::OsStrExt;
 use std::path::PathBuf;
 use std::ptr::{null, null_mut};
-use windows_sys::{s, w};
+
 use windows_sys::Win32::Foundation::{CloseHandle, FALSE, HANDLE, INVALID_HANDLE_VALUE, TRUE};
 use windows_sys::Win32::System::Diagnostics::Debug::WriteProcessMemory;
 use windows_sys::Win32::System::Diagnostics::ToolHelp::{CreateToolhelp32Snapshot, Process32NextW, PROCESSENTRY32W, TH32CS_SNAPPROCESS};
 use windows_sys::Win32::System::LibraryLoader::{GetModuleHandleW, GetProcAddress};
 use windows_sys::Win32::System::Memory::*;
 use windows_sys::Win32::System::Threading::*;
+use windows_sys::{s, w};
 
 fn main() {
     let process_name = "mpc-be64.exe";
@@ -40,12 +41,9 @@ fn main() {
     print!("Opening process...");
     let process_handle = unsafe {
         OpenProcess(
-            PROCESS_CREATE_THREAD |
-                PROCESS_QUERY_INFORMATION |
-                PROCESS_VM_OPERATION |
-                PROCESS_VM_WRITE |
-                PROCESS_VM_READ,
-            FALSE, pid
+            PROCESS_CREATE_THREAD | PROCESS_QUERY_INFORMATION | PROCESS_VM_OPERATION | PROCESS_VM_WRITE | PROCESS_VM_READ,
+            FALSE,
+            pid
         )
     };
     assert_ne!(process_handle, 0, "Failed to open process");
@@ -64,16 +62,21 @@ fn main() {
             null(),
             path.len() * size_of::<u16>(),
             MEM_COMMIT | MEM_RESERVE,
-            PAGE_READWRITE);
+            PAGE_READWRITE
+        );
         assert!(!virtual_alloc_ptr.is_null(), "Failed to allocate memory");
 
-        assert_ne!(WriteProcessMemory(
-            process_handle,
-            virtual_alloc_ptr,
-            path.as_ptr() as _,
-            path.len() * size_of::<u16>(),
-            null_mut()
-        ), FALSE, "Failed to write memory");
+        assert_ne!(
+            WriteProcessMemory(
+                process_handle,
+                virtual_alloc_ptr,
+                path.as_ptr() as _,
+                path.len() * size_of::<u16>(),
+                null_mut()
+            ),
+            FALSE,
+            "Failed to write memory"
+        );
 
         virtual_alloc_ptr
     };
@@ -87,15 +90,19 @@ fn main() {
         assert!(load_library.is_some(), "Failed to get address of LoadLibraryW");
 
         let mut thread_id = 0;
-        assert_ne!(CreateRemoteThread(
-            process_handle,
-            null(),
+        assert_ne!(
+            CreateRemoteThread(
+                process_handle,
+                null(),
+                0,
+                transmute(load_library),
+                memory_ptr,
+                0,
+                &mut thread_id
+            ),
             0,
-            transmute(load_library),
-            memory_ptr,
-            0,
-            &mut thread_id
-        ), 0, "Failed to create thread in target process");
+            "Failed to create thread in target process"
+        );
         thread_id
     };
     println!("  Success (tid: 0x{:x})", remote_thread);
@@ -115,10 +122,7 @@ impl Default for ProcessIter {
         let snapshot = unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) };
         assert_ne!(snapshot, INVALID_HANDLE_VALUE, "Failed to take snapshot of current process list");
 
-        Self {
-            entry,
-            snapshot,
-        }
+        Self { entry, snapshot }
     }
 }
 
@@ -140,12 +144,12 @@ impl Iterator for ProcessIter {
     type Item = (u32, String);
 
     fn next(&mut self) -> Option<Self::Item> {
-        match unsafe { Process32NextW(self.snapshot, &mut self.entry)} {
+        match unsafe { Process32NextW(self.snapshot, &mut self.entry) } {
             TRUE => {
                 let pid = self.entry.th32ProcessID;
                 let name = trim(&self.entry.szExeFile);
                 Some((pid, name))
-            },
+            }
             _ => None
         }
     }

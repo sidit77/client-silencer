@@ -1,9 +1,11 @@
 use core::ffi::CStr;
 use core::ptr::{addr_of, null};
+
 use windows_sys::Win32::System::Diagnostics::Debug::*;
 use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows_sys::Win32::System::SystemServices::*;
 use windows_sys::Win32::System::WindowsProgramming::*;
+
 use crate::ensure;
 use crate::utils::{Error, IntPtr, IterPtr, RawIterPtr};
 
@@ -43,10 +45,9 @@ pub unsafe fn find_function_iat(module: &[u8], name: &[u8]) -> Result<IntPtr, Er
 
     let import_dir = optional_header.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT as usize];
 
-    for import_descriptor in IterPtr::<IMAGE_IMPORT_DESCRIPTOR>::until(
-        (base + import_dir.VirtualAddress.into()).as_ptr(),
-        |desc| desc.Anonymous.Characteristics != 0
-    ) {
+    for import_descriptor in IterPtr::<IMAGE_IMPORT_DESCRIPTOR>::until((base + import_dir.VirtualAddress.into()).as_ptr(), |desc| {
+        desc.Anonymous.Characteristics != 0
+    }) {
         let module_name = CStr::from_ptr((base + import_descriptor.Name.into()).as_ptr());
         //writeln!(file, "{:?}", module_name);
         if module_name.to_bytes() == module {
@@ -55,10 +56,7 @@ pub unsafe fn find_function_iat(module: &[u8], name: &[u8]) -> Result<IntPtr, Er
             ensure!(thunk_ilt.is_not_null(), Error::BadPeFormat);
             ensure!(thunk_iat.is_not_null(), Error::BadPeFormat);
 
-            let ilt_iter = IterPtr::<IMAGE_THUNK_DATA>::until(
-                (base + thunk_ilt).as_ptr(),
-                |ilt| ilt.u1.AddressOfData != 0
-            );
+            let ilt_iter = IterPtr::<IMAGE_THUNK_DATA>::until((base + thunk_ilt).as_ptr(), |ilt| ilt.u1.AddressOfData != 0);
             let iat_iter = RawIterPtr::<IMAGE_THUNK_DATA>::new((base + thunk_iat).as_ptr());
             for (ilt, iat) in ilt_iter.zip(iat_iter) {
                 if ilt.u1.Ordinal & IMAGE_ORDINAL_FLAG == 0 {
@@ -66,11 +64,11 @@ pub unsafe fn find_function_iat(module: &[u8], name: &[u8]) -> Result<IntPtr, Er
                     let func_name = CStr::from_ptr((*import).Name.as_ptr() as _);
                     //writeln!(file, "    {:?}", func_name);
                     if func_name.to_bytes() == name {
-                        return Ok(addr_of!((*iat).u1.Function).into())
+                        return Ok(addr_of!((*iat).u1.Function).into());
                     }
                 }
             }
-            return Err(Error::FunctionNotFound)
+            return Err(Error::FunctionNotFound);
         }
     }
     Err(Error::ModuleNotFound)

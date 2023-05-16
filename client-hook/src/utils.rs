@@ -1,17 +1,18 @@
 use core::ffi::c_void;
 use core::mem::size_of;
 use core::ops::{Add, Sub};
+
 use windows_sys::w;
 use windows_sys::Win32::Foundation::FALSE;
-use windows_sys::Win32::System::Memory::{PAGE_READWRITE, VirtualProtect};
+use windows_sys::Win32::System::Memory::{VirtualProtect, PAGE_READWRITE};
 
 #[macro_export]
 macro_rules! ensure {
     ($cond:expr, $result:expr) => {
         if !($cond) {
-            return Err($result)
+            return Err($result);
         }
-    }
+    };
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -117,15 +118,13 @@ impl<T> IterPtr<T> {
             valid
         }
     }
-
 }
 
 impl<T> Iterator for IterPtr<T> {
     type Item = T;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self
-            .inner
+        self.inner
             .next()
             .map(|ptr| unsafe { ptr.read() })
             .filter(|next| (self.valid)(next))
