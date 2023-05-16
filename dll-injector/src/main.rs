@@ -1,4 +1,5 @@
 use std::env::{current_exe, set_current_dir};
+use std::io::Read;
 use std::iter::once;
 use std::mem::{size_of, transmute, zeroed};
 use std::os::windows::ffi::OsStrExt;
@@ -107,6 +108,10 @@ fn main() {
     };
     println!("  Success (tid: 0x{:x})", remote_thread);
     println!("Done");
+
+    println!("\nPress any key to continue...");
+    let mut buf = [0u8; 1];
+    std::io::stdin().read(&mut buf).expect("Failed to wait for key");
 }
 
 pub struct ProcessIter {
