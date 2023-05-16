@@ -14,7 +14,7 @@ use windows_sys::Win32::System::Threading::*;
 use windows_sys::{s, w};
 
 fn main() {
-    let process_name = "mpc-be64.exe";
+    let process_name = "LeagueClientUx.exe";
 
     current_exe()
         .map(|mut path| {
