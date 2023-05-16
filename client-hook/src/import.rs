@@ -1,5 +1,5 @@
-use std::ffi::CStr;
-use std::ptr::{addr_of, null};
+use core::ffi::CStr;
+use core::ptr::{addr_of, null};
 use windows_sys::Win32::System::Diagnostics::Debug::*;
 use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows_sys::Win32::System::SystemServices::*;

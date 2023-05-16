@@ -1,11 +1,16 @@
+#![no_std]
 #![allow(clippy::missing_safety_doc)]
+
+extern crate alloc;
 
 mod import;
 mod utils;
 
-use std::ffi::c_void;
-use std::iter::once;
-use std::ptr::{null, null_mut};
+use alloc::format;
+use alloc::vec::Vec;
+use core::ffi::c_void;
+use core::iter::once;
+use core::ptr::{null, null_mut};
 use once_cell::sync::OnceCell;
 use windows_sys::w;
 use windows_sys::Win32::Foundation::{BOOL, FALSE, HMODULE, HWND, TRUE};

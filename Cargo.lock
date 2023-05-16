@@ -23,17 +23,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "client-silencer"
-version = "0.1.0"
-dependencies = [
- "client-hook",
- "num_enum",
- "sysinfo",
- "widestring",
- "windows",
-]
-
-[[package]]
 name = "core-foundation-sys"
 version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -80,6 +69,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3c063cd8cc95f5c377ed0d4b49a4b21f632396ff690e8470c29b3359b346984b"
 dependencies = [
  "cfg-if",
+]
+
+[[package]]
+name = "dll-injector"
+version = "0.1.0"
+dependencies = [
+ "num_enum",
+ "sysinfo",
+ "widestring",
+ "windows",
 ]
 
 [[package]]

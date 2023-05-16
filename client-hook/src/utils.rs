@@ -1,6 +1,6 @@
-use std::ffi::c_void;
-use std::mem::size_of;
-use std::ops::{Add, Sub};
+use core::ffi::c_void;
+use core::mem::size_of;
+use core::ops::{Add, Sub};
 use windows_sys::Win32::Foundation::FALSE;
 use windows_sys::Win32::System::Memory::{PAGE_READWRITE, VirtualProtect};
 

@@ -1,29 +1,10 @@
-[package]
-name = "client-silencer"
-version = "0.1.0"
-edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [workspace]
 members = [
-    ".",
-    "./client-hook"
+    "client-hook",
+    "dll-injector"
 ]
 
-[dependencies]
-client-hook = { path = "client-hook" }
-widestring = "1"
-num_enum = "0.6"
-sysinfo = "0.29"
-windows = { version = "0.48", features = [
-    "Win32_Foundation",
-    "Win32_System_Console",
-    "Win32_System_Threading",
-    "Win32_UI_Accessibility",
-    "Win32_UI_WindowsAndMessaging",
-    "Win32_System_LibraryLoader",
-    "Win32_System_Memory",
-    "Win32_System_Diagnostics_Debug",
-    "Win32_Security"
-]}
+[profile.release]
+lto = true
+codegen-units = 1
+
