@@ -1,17 +1,18 @@
 use std::env::current_exe;
-use std::mem::size_of_val;
-use sysinfo::{PidExt, ProcessExt, SystemExt};
+use std::mem::{size_of_val, transmute};
+use std::ptr::{null, null_mut};
 use widestring::{U16CString};
-use windows::imp::GetProcAddress;
-use windows::{s, w};
-use windows::Win32::System::Diagnostics::Debug::WriteProcessMemory;
-use windows::Win32::System::LibraryLoader::GetModuleHandleW;
-use windows::Win32::System::Memory::{MEM_COMMIT, MEM_RESERVE, PAGE_READWRITE, VirtualAllocEx};
-use windows::Win32::System::Threading::*;
+use windows_sys::{s, w};
+use windows_sys::Win32::Foundation::FALSE;
+use windows_sys::Win32::System::Diagnostics::Debug::WriteProcessMemory;
+use windows_sys::Win32::System::LibraryLoader::{GetModuleHandleW, GetProcAddress};
+use windows_sys::Win32::System::Memory::*;
+use windows_sys::Win32::System::Threading::*;
+
 
 fn main() {
     unsafe {
-        let pid = sysinfo::System::new_all().processes_by_name("mpc-be64.exe").next().unwrap().pid().as_u32();
+        let pid = 1234;//sysinfo::System::new_all().processes_by_name("mpc-be64.exe").next().unwrap().pid().as_u32();
 
         println!("pid: {}", pid);
 
@@ -21,13 +22,14 @@ fn main() {
                 PROCESS_VM_OPERATION |
                 PROCESS_VM_WRITE |
                 PROCESS_VM_READ,
-            false, pid
-        ).expect("Failed to open process");
+            FALSE, pid
+        );
+        assert_ne!(process_handle, 0, "Failed to open process");
 
-        let kernel32 = GetModuleHandleW(w!("kernel32.dll")).unwrap();
-        let load_library = GetProcAddress(kernel32.0, s!("LoadLibraryW"));
-        println!("{:?}", load_library);
-        assert!(!load_library.is_null());
+        let kernel32 = GetModuleHandleW(w!("kernel32.dll"));
+        assert_ne!(kernel32, 0, "Failed to get handle of kernel32.dll");
+        let load_library = GetProcAddress(kernel32, s!("LoadLibraryW"));
+        assert!(load_library.is_some(), "Failed to get address of LoadLibraryW");
         let mut dll_path = current_exe().unwrap();
         dll_path.pop();
         dll_path.push("client_hook.dll");
@@ -39,31 +41,31 @@ fn main() {
 
         let virtual_alloc_ptr = VirtualAllocEx(
             process_handle,
-            None,
+            null(),
             size_of_val(dll_path),
             MEM_COMMIT | MEM_RESERVE,
             PAGE_READWRITE);
         println!("{:?}", virtual_alloc_ptr);
-        assert!(!virtual_alloc_ptr.is_null());
+        assert!(!virtual_alloc_ptr.is_null(), "Failed to allocate memory");
 
 
-        WriteProcessMemory(
+        assert_ne!(WriteProcessMemory(
             process_handle,
             virtual_alloc_ptr,
             dll_path.as_ptr() as _,
             size_of_val(dll_path),
-            None
-        ).unwrap();
+            null_mut()
+        ), FALSE, "Failed to write memory");
 
-        CreateRemoteThread(
+        assert_ne!(CreateRemoteThread(
             process_handle,
-            None,
+            null(),
             0,
-            Some(std::mem::transmute(load_library)),
-            Some(virtual_alloc_ptr),
+            transmute(load_library),
+            virtual_alloc_ptr,
             0,
-            None
-        ).unwrap();
+            null_mut()
+        ), 0, "Failed to create thread in target process");
 
     }
 }
