@@ -20,6 +20,9 @@ macro_rules! ensure {
 pub struct IntPtr(usize);
 
 impl IntPtr {
+    pub const fn null() -> Self {
+        Self(0)
+    }
     pub fn is_not_null(self) -> bool {
         self.0 != 0
     }

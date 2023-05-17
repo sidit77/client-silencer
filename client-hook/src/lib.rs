@@ -22,7 +22,7 @@ use windows_sys::Win32::System::Threading::{CreateThread, ExitProcess};
 use windows_sys::Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_OK, SET_WINDOW_POS_FLAGS, SWP_NOZORDER};
 
 use crate::import::find_function_iat;
-use crate::utils::{write_protected, Error};
+use crate::utils::{write_protected, Error, IntPtr};
 
 #[panic_handler]
 fn panic(_info: &panic::PanicInfo) -> ! {
@@ -45,10 +45,18 @@ pub unsafe extern "stdcall" fn DllMain(hmodule: HMODULE, reason: u32, _: *mut c_
             if result == 0 {
                 return FALSE;
             }
-        }
+        },
+        DLL_PROCESS_DETACH => unhook(),
         _ => {}
     }
     TRUE
+}
+
+unsafe extern "system" fn attachment_thread(_lpthreadparameter: *mut c_void) -> u32 {
+    if let Err(err) = hook() {
+        MessageBoxW(0, err.msg(), w!("Hook Failed"), MB_OK);
+    }
+    0
 }
 
 //type WinPosSig = extern "system" fn(HWND, HWND, i32, i32, i32, i32, SET_WINDOW_POS_FLAGS) -> BOOL;
@@ -71,8 +79,8 @@ pub unsafe extern "stdcall" fn DllMain(hmodule: HMODULE, reason: u32, _: *mut c_
 //    Ok(())
 //}
 
-
 type SetPosProto = extern "system" fn(HWND, HWND, i32, i32, i32, i32, SET_WINDOW_POS_FLAGS) -> BOOL;
+static POS_FUNC_PTR: AtomicCell<IntPtr> = AtomicCell::new(IntPtr::null());
 static OLD_POS_FUNC: AtomicCell<Option<SetPosProto>> = AtomicCell::new(None);
 #[allow(non_snake_case)]
 pub unsafe extern "system" fn SetWindowPos(hwnd: HWND, hwndinsertafter: HWND, x: i32, y: i32, cx: i32, cy: i32, uflags: SET_WINDOW_POS_FLAGS) -> BOOL {
@@ -85,14 +93,17 @@ pub unsafe extern "system" fn SetWindowPos(hwnd: HWND, hwndinsertafter: HWND, x:
 unsafe fn hook() -> Result<(), Error> {
     let func_ptr = find_function_iat(b"user32.dll", b"SetWindowPos")
         .or_else(|_| find_function_iat(b"USER32.dll", b"SetWindowPos"))?;
-    OLD_POS_FUNC.store(unsafe { func_ptr.read() });
+    OLD_POS_FUNC.store(func_ptr.read());
+    POS_FUNC_PTR.store(func_ptr);
     write_protected(func_ptr.as_ptr(), SetWindowPos as usize)?;
     Ok(())
 }
 
-unsafe extern "system" fn attachment_thread(_lpthreadparameter: *mut c_void) -> u32 {
-    if let Err(err) = hook() {
-        MessageBoxW(0, err.msg(), w!("Hook Failed"), MB_OK);
+unsafe fn unhook() {
+    if let Some(func) = OLD_POS_FUNC.load() {
+        let ptr = POS_FUNC_PTR.load();
+        if ptr.is_not_null() {
+            let _ = write_protected(ptr.as_ptr(), func as usize);
+        }
     }
-    0
 }
