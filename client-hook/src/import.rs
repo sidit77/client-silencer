@@ -45,9 +45,10 @@ pub unsafe fn find_function_iat(module: &[u8], name: &[u8]) -> Result<IntPtr, Er
 
     let import_dir = optional_header.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT as usize];
 
-    for import_descriptor in IterPtr::<IMAGE_IMPORT_DESCRIPTOR>::until((base + import_dir.VirtualAddress.into()).as_ptr(), |desc| {
-        desc.Anonymous.Characteristics != 0
-    }) {
+    for import_descriptor in IterPtr::<IMAGE_IMPORT_DESCRIPTOR>::until(
+        (base + import_dir.VirtualAddress.into()).as_ptr(),
+        |desc| desc.Anonymous.Characteristics != 0
+    ) {
         let module_name = CStr::from_ptr((base + import_descriptor.Name.into()).as_ptr());
         //writeln!(file, "{:?}", module_name);
         if module_name.to_bytes() == module {

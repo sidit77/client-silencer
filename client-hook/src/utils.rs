@@ -79,14 +79,6 @@ impl Add for IntPtr {
     }
 }
 
-impl Sub for IntPtr {
-    type Output = IntPtr;
-
-    fn sub(self, rhs: Self) -> Self::Output {
-        IntPtr(self.0 - rhs.0)
-    }
-}
-
 #[derive(Copy, Clone)]
 pub struct RawIterPtr<T> {
     ptr: *const T

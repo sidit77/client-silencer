@@ -93,8 +93,8 @@ pub unsafe extern "system" fn SetWindowPos(hwnd: HWND, hwndinsertafter: HWND, x:
 unsafe fn hook() -> Result<(), Error> {
     let func_ptr = find_function_iat(b"user32.dll", b"SetWindowPos")
         .or_else(|_| find_function_iat(b"USER32.dll", b"SetWindowPos"))?;
-    OLD_POS_FUNC.store(func_ptr.read());
     POS_FUNC_PTR.store(func_ptr);
+    OLD_POS_FUNC.store(func_ptr.read());
     write_protected(func_ptr.as_ptr(), SetWindowPos as usize)?;
     Ok(())
 }
